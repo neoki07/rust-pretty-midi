@@ -94,17 +94,19 @@ pub struct TimeSignature {
 impl TimeSignature {
     pub fn new(numerator: u8, denominator: u64, time: f64) -> Result<Self> {
         if numerator == 0 {
-            Err(ValueError(
-                format!("{} is not a valid `numerator` value", numerator).to_string(),
-            ))?
+            return Err(
+                ValueError(format!("{} is not a valid `numerator` value", numerator)).into(),
+            );
         }
         if denominator == 0 {
-            Err(ValueError(
-                format!("{} is not a valid `denominator` value", denominator).to_string(),
-            ))?
+            return Err(ValueError(format!(
+                "{} is not a valid `denominator` value",
+                denominator
+            ))
+            .into());
         }
         if time < 0.0 {
-            Err(ValueError(format!("{} is not a valid `time` value", time)))?
+            return Err(ValueError(format!("{} is not a valid `time` value", time)).into());
         }
 
         Ok(TimeSignature {
@@ -148,15 +150,14 @@ pub struct KeySignature {
 impl KeySignature {
     pub fn new(key_number: u8, time: f64) -> Result<Self> {
         if key_number >= 24 {
-            Err(ValueError(
-                format!("{} is not a valid `key_number` type or value", key_number).to_string(),
-            ))?
+            return Err(ValueError(format!(
+                "{} is not a valid `key_number` type or value",
+                key_number
+            ))
+            .into());
         }
         if time < 0.0 {
-            Err(ValueError(format!(
-                "{} is not a valid `time` type or value",
-                time
-            )))?
+            return Err(ValueError(format!("{} is not a valid `time` type or value", time)).into());
         }
 
         Ok(KeySignature { key_number, time })

@@ -27,9 +27,7 @@ pub(crate) struct CustomTrackEvent<'a> {
 ///                  For example, C major is 0 and C minor is 12.
 pub fn key_number_to_key_name(key_number: u8) -> Result<String> {
     if key_number >= 24 {
-        Err(ValueError(
-            "`key_number` is larger than or equal to 24".to_string(),
-        ))?
+        return Err(ValueError("`key_number` is larger than or equal to 24".to_string()).into());
     }
 
     // preference to keys with flats
@@ -43,13 +41,13 @@ pub fn key_number_to_key_name(key_number: u8) -> Result<String> {
 
     // check if mode is major or minor
     if mode == 0 {
-        Ok(format!("{}{}", keys[key_idx], " Major").to_string())
+        Ok(format!("{}{}", keys[key_idx], " Major"))
     } else {
         // preference to C#, F# and G# minor
         if [1, 6, 8].contains(&key_idx) {
-            Ok(format!("{}{}", keys[key_idx - 1], "# minor").to_string())
+            Ok(format!("{}{}", keys[key_idx - 1], "# minor"))
         } else {
-            Ok(format!("{}{}", keys[key_idx], " minor").to_string())
+            Ok(format!("{}{}", keys[key_idx], " minor"))
         }
     }
 }

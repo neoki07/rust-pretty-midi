@@ -79,8 +79,8 @@ impl Debug for Instrument {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Instrument {} program: {}, is_drum: {}, name: \"{}\" {}",
-            "{", self.program, self.is_drum, self.name, "}"
+            "Instrument {{ program: {}, is_drum: {}, name: \"{}\" }}",
+            self.program, self.is_drum, self.name
         )
     }
 }

@@ -27,11 +27,19 @@ use std::{
 };
 
 // The largest we'd ever expect a tick to be.
-const MAX_TICK: usize = usize::MAX;
+const MAX_TICK: usize = 10usize.pow(7);
 // MIDI clocks per click.
 const CPC: u8 = 24;
 // 32nd notes per quarter.
 const TPQ: u8 = 8;
+
+type PrettyMIDIEvents = (
+    Vec<KeySignature>,
+    Vec<TimeSignature>,
+    Vec<Lyric>,
+    Vec<Text>,
+    Vec<Instrument>,
+);
 
 /// A container for MIDI data in an easily-manipulable format.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -116,13 +124,11 @@ impl PrettyMIDI {
         // If max_tick is huge, the MIDI file is probably corrupt
         // and creating the __tick_to_time array will thrash memory.
         if max_tick > MAX_TICK {
-            Err(ValueError(
-                format!(
-                    "MIDI file has a largest tick of {}, it is likely corrupt",
-                    max_tick
-                )
-                .to_string(),
-            ))?
+            return Err(ValueError(format!(
+                "MIDI file has a largest tick of {}, it is likely corrupt",
+                max_tick
+            ))
+            .into());
         }
 
         // Create list that maps ticks to time in seconds.
@@ -142,8 +148,8 @@ impl PrettyMIDI {
                 {
                     log::warn!(
                         "Tempo, Key or Time signature change events found on \
-                             non-zero tracks. This is not a valid type 0 or type 1 \
-                             MIDI file. Tempo, Key or Time Signature may be wrong."
+                        non-zero tracks. This is not a valid type 0 or type 1 \
+                        MIDI file. Tempo, Key or Time Signature may be wrong."
                     )
                 }
             }
@@ -183,7 +189,7 @@ impl PrettyMIDI {
     ///
     /// * `max_tick` - Last tick to compute time for.  If ``self._tick_scales`` contains a
     ///                tick which is larger than this value, it will be used instead.
-    pub fn _update_tick_to_time(&self, max_tick: usize) -> () {
+    pub fn _update_tick_to_time(&self, max_tick: usize) {
         // If max_tick is smaller than the largest tick in tick_scales,
         // use this largest tick instead.
         let max_scale_tick = self
@@ -249,7 +255,7 @@ impl PrettyMIDI {
     pub fn tick_to_time(&self, tick: usize) -> Result<f64> {
         // Check that the tick isn't too big.
         if tick >= MAX_TICK {
-            Err(IndexError("Supplied tick is too large.".to_string()))?
+            return Err(IndexError("Supplied tick is too large.".to_string()).into());
         }
         // If we haven't compute the mapping for a tick this large, compute it.
         if tick >= self.__tick_to_time.borrow().len() {
@@ -306,7 +312,7 @@ impl PrettyMIDI {
             let secondary_sort = |e: &CustomTrackEvent| -> Option<i32> {
                 match e.kind {
                     TrackEventKind::Meta(meta) => match meta {
-                        MetaMessage::Tempo(..) => Some(1 * 256 * 256),
+                        MetaMessage::Tempo(..) => Some(256 * 256),
                         MetaMessage::TimeSignature(..) => Some(2 * 256 * 256),
                         MetaMessage::KeySignature(..) => Some(3 * 256 * 256),
                         MetaMessage::Lyric(..) => Some(4 * 256 * 256),
@@ -526,30 +532,28 @@ impl PrettyMIDI {
             // tick and pitch, put the note off event first.
             for m in 0..track.len() - 1 {
                 if track[m].tick == track[m + 1].tick {
-                    match (track[m].kind, track[m + 1].kind) {
-                        (
-                            TrackEventKind::Midi {
-                                message:
-                                    MidiMessage::NoteOn {
-                                        key: key1,
-                                        vel: vel1,
-                                    },
-                                ..
-                            },
-                            TrackEventKind::Midi {
-                                message:
-                                    MidiMessage::NoteOn {
-                                        key: key2,
-                                        vel: vel2,
-                                    },
-                                ..
-                            },
-                        ) => {
-                            if key1 == key2 && vel1.as_int() != 0 && vel2.as_int() == 0 {
-                                track.swap(m, m + 1);
-                            }
+                    if let (
+                        TrackEventKind::Midi {
+                            message:
+                                MidiMessage::NoteOn {
+                                    key: key1,
+                                    vel: vel1,
+                                },
+                            ..
+                        },
+                        TrackEventKind::Midi {
+                            message:
+                                MidiMessage::NoteOn {
+                                    key: key2,
+                                    vel: vel2,
+                                },
+                            ..
+                        },
+                    ) = (track[m].kind, track[m + 1].kind)
+                    {
+                        if key1 == key2 && vel1.as_int() != 0 && vel2.as_int() == 0 {
+                            track.swap(m, m + 1);
                         }
-                        _ => (),
                     }
                 }
             }
@@ -640,16 +644,14 @@ impl Debug for PrettyMIDI {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PrettyMIDI {} resolution: {}, instruments: {:?}, key_signature_changes: {:?},\
-             time_signature_changes: {:?}, lyrics: {:?}, text_events: {:?} {}",
-            "{",
+            "PrettyMIDI {{ resolution: {}, instruments: {:?}, key_signature_changes: {:?},\
+            time_signature_changes: {:?}, lyrics: {:?}, text_events: {:?} }}",
             self.resolution,
             self.instruments,
             self.key_signature_changes,
             self.time_signature_changes,
             self.lyrics,
             self.text_events,
-            "}"
         )
     }
 }
@@ -660,7 +662,7 @@ impl Debug for PrettyMIDI {
 /// # Arguments
 ///
 /// * `midi_data` - MIDI object from which data will be read.
-fn _load_tempo_changes(tracks: &Vec<CustomTrack>, resolution: u16) -> Vec<(usize, f64)> {
+fn _load_tempo_changes(tracks: &[CustomTrack], resolution: u16) -> Vec<(usize, f64)> {
     let resolution = resolution as f64;
     // MIDI data is given in "ticks".
     // We need to convert this to clock seconds.
@@ -699,7 +701,7 @@ fn _load_tempo_changes(tracks: &Vec<CustomTrack>, resolution: u16) -> Vec<(usize
 ///
 /// * `max_tick` - Last tick to compute time for.  If ``self._tick_scales`` contains a
 ///                tick which is larger than this value, it will be used instead.
-fn _create_tick_to_time(max_tick: usize, _tick_scales: &Vec<(usize, f64)>) -> Vec<f64> {
+fn _create_tick_to_time(max_tick: usize, _tick_scales: &[(usize, f64)]) -> Vec<f64> {
     // If max_tick is smaller than the largest tick in tick_scales,
     // use this largest tick instead.
     assert!(!_tick_scales.is_empty());
@@ -736,16 +738,7 @@ fn _create_tick_to_time(max_tick: usize, _tick_scales: &Vec<(usize, f64)>) -> Ve
 ///
 /// * `tracks` - MIDI tracks from which data will be read.
 /// * `__tick_to_time` - TODO
-fn _load_events(
-    tracks: &Vec<CustomTrack>,
-    __tick_to_time: &Vec<f64>,
-) -> Result<(
-    Vec<KeySignature>,
-    Vec<TimeSignature>,
-    Vec<Lyric>,
-    Vec<Text>,
-    Vec<Instrument>,
-)> {
+fn _load_events(tracks: &[CustomTrack], __tick_to_time: &[f64]) -> Result<PrettyMIDIEvents> {
     let mut key_signature_changes = vec![];
     let mut time_signature_changes = vec![];
     let mut lyrics = vec![];
@@ -769,7 +762,7 @@ fn _load_events(
             }
             TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, denominator, ..)) => {
                 let ts_obj = TimeSignature::new(
-                    numerator.into(),
+                    numerator,
                     2u64.pow(denominator.into()), // TODO check overflow.
                     __tick_to_time[event.tick],
                 )?;
@@ -827,12 +820,12 @@ fn _load_events(
                     let notes_to_close: Vec<(usize, u8)> = open_notes
                         .iter()
                         .filter(|a| a.0 != end_tick)
-                        .map(|a| *a)
+                        .cloned()
                         .collect();
                     let notes_to_keep: Vec<(usize, u8)> = open_notes
                         .iter()
                         .filter(|a| a.0 == end_tick)
-                        .map(|a| *a)
+                        .cloned()
                         .collect();
 
                     for (start_tick, velocity) in notes_to_close.iter() {
@@ -853,7 +846,7 @@ fn _load_events(
                             .push(note);
                     }
 
-                    if notes_to_close.len() > 0 && notes_to_keep.len() > 0 {
+                    if !notes_to_close.is_empty() && !notes_to_keep.is_empty() {
                         // Note-on on the same tick but we already closed
                         // some previous notes -> it will continue, keep it.
                         last_note_on.insert(k, notes_to_keep);
