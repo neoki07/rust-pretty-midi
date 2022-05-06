@@ -218,7 +218,7 @@ impl PrettyMIDI {
         }
         // For the final interval, use the final tempo setting
         // and ticks from the final tempo setting until max_tick
-        let (start_tick, tick_scale) = self._tick_scales.borrow().last().unwrap().clone();
+        let (start_tick, tick_scale) = *self._tick_scales.borrow().last().unwrap();
         for (j, tick) in (0..max_tick + 1 - start_tick).enumerate() {
             self.__tick_to_time.borrow_mut()[start_tick + j] =
                 last_end_time + tick_scale * tick as f64;
@@ -279,7 +279,7 @@ impl PrettyMIDI {
             // start from time at end of __tick_to_time.
             tick -= 1;
             // Add on ticks assuming the final tick_scale amount.
-            let (_, final_tick_scale) = self._tick_scales.borrow().last().unwrap().clone();
+            let (_, final_tick_scale) = *self._tick_scales.borrow().last().unwrap();
             let tick = tick as f64 + (time - self.__tick_to_time.borrow()[tick]) / final_tick_scale;
             // Re-round/quantize.
             return tick.round() as usize;
